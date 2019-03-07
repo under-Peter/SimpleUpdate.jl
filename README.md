@@ -5,3 +5,6 @@
 [![Build Status](https://travis-ci.com/under-Peter/SimpleUpdate.jl.svg?branch=master)](https://travis-ci.com/under-Peter/SimpleUpdate.jl)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/under-Peter/SimpleUpdate.jl?svg=true)](https://ci.appveyor.com/project/under-Peter/SimpleUpdate-jl)
 [![Codecov](https://codecov.io/gh/under-Peter/SimpleUpdate.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/under-Peter/SimpleUpdate.jl)
+
+## About
+SimpleUpdate.jl is a package that implements the algorithm of the same name for *iPEPS*.
