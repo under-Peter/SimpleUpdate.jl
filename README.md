@@ -10,7 +10,7 @@
 SimpleUpdate.jl is a package that implements the algorithm of the same name for *iPEPS* as follows:
 
 1. The problem is described by providing two initial rank-5 tensors `a` and `b` and a propagator rank-4 tensor `u`  whose indices are ordered as:
-
+```
 
     3|________4|
      [____u____]
@@ -19,6 +19,7 @@ SimpleUpdate.jl is a package that implements the algorithm of the same name for 
        5| /3
     4--[a]--2
        /1
+```
 here the 5th index of `a` is the _physical_ index, indices 1-4 are virtual.
 
 2. `simpleupdate(a,b,u)` returns a `SimpleUpdateProblem` struct which contains the three tensors that specify the problem as well as the weights on the virtual bonds that have been extracted to describe an environment.
