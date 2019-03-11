@@ -103,8 +103,8 @@ function extract_weights!(a,b)
     σab, a , b = extract_weight!(a,b)
     σba, b , a = extract_weight!(b,a)
     @tensor begin
-        arot[1,2,3,4,5] := a[2,3,4,1,5]
-        brot[1,2,3,4,5] := b[2,3,4,1,5]
+        arot[1,2,3,4,5] := a[4,1,2,3,5]
+        brot[1,2,3,4,5] := b[4,1,2,3,5]
     end
 
     ωab, arot, brot = extract_weight!(arot, brot)
