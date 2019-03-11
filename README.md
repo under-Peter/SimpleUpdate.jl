@@ -29,6 +29,7 @@ The weights are extracted using `extract_weight!`, see `?extract_weight!` for th
 
 ## Issues
 
+
 When doing e.g.
 ```julia
 χ = 4
