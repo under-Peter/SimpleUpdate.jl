@@ -111,54 +111,63 @@ function extract_weights!(a,b)
     ωba, brot, arot = extract_weight!(brot, arot)
 
     @tensor begin
-        a[1,2,3,4,5] = arot[4,1,2,3,5]
-        b[1,2,3,4,5] = brot[4,1,2,3,5]
+        a[1,2,3,4,5] = arot[2,3,4,1,5]
+        b[1,2,3,4,5] = brot[2,3,4,1,5]
     end
 
     return a, b, σab, σba, ωab, ωba
 end
 
 update(su::SimpleUpdateProblem) = update!(deepcopy(su))
+
 function update!(su::SimpleUpdateProblem)
     @unpack a, b, σab, σba, ωab, ωba, u = su
 
     update!((a,b,σab), (σba, ωab, ωba, u))
-    update!((b,a,σba), (σab, ωab, ωba, u))
+    update!((b,a,σba), (σab, ωba, ωab, u))
 
-    arot = tensorcopy(a,(1,2,3,4,5), (4,1,2,3,5))
-    brot = tensorcopy(b,(1,2,3,4,5), (4,1,2,3,5))
+    @tensor begin
+        arot[1,2,3,4,5] := a[4,1,2,3,5]
+        brot[1,2,3,4,5] := b[4,1,2,3,5]
+    end
+
     update!((arot, brot, ωab), (ωba, σab, σba, u))
-    update!((brot, arot, ωba), (ωab, σab, σba, u))
-    tensorcopy!(arot, (4,1,2,3,5), a, (1,2,3,4,5))
-    tensorcopy!(brot, (4,1,2,3,5), b, (1,2,3,4,5))
+    update!((brot, arot, ωba), (ωab, σba, σab, u))
+
+    @tensor begin
+        a[1,2,3,4,5] = arot[2,3,4,1,5]
+        b[1,2,3,4,5] = brot[2,3,4,1,5]
+    end
 
     return su
 end
 
-function update!((a,b,σab), (σba, ωab, ωba, h))
+function update!((a,b,σab), (σba, ωab, ωba, u))
     #contract with weights
     @tensor begin
         aw[1,2,3,4,5] := σba[4,-4] * a[-1,2,-3,-4,5] * ωba[1,-1] * ωab[-3,3]
-        bw[1,2,3,4,5] := σab[2,-2] * b[-1,-2,-3,4,5] * ωba[1,-1] * ωab[-3,3]
+        bw[1,2,3,4,5] := σba[-2,2] * b[-1,-2,-3,4,5] * ωab[1,-1] * ωba[-3,3]
     end
 
-    #reduce tensors and apply h
+    #reduce tensors and apply u
     qa, ra = tensorqr(aw, ((1,3,4),(5,2)))
     rb, qb = tensorrq(bw, ((4,5),(1,2,3)))
-    @tensor θ[1,2,3,4] := ra[1,p1,-1] * σab[-1,-2] * rb[-2,p2,3] * h[p1,p2,2,4]
+    @tensor θ[1,2,3,4] := ra[1,p1,-1] * σab[-1,-2] * rb[-2,p2,3] * u[p1,p2,2,4]
 
     #truncate bond dim
     s = a isa DTensor ? size(a,2) : sizes(a,2)[1]
     Uθ, Σθ, Vdθ = tensorsvd(θ, ((1,2),(3,4)), svdtrunc = svdtrunc_maxχ(s))
 
+    @tensor begin
+        a[1,2,3,4,5] = qa[1,3,4,-1] * Uθ[-1,5,2]
+        b[1,2,3,4,5] = Vdθ[4,-4,5] * qb[-4,1,2,3]
+    end
+
     #reextract weights
     iσab, iσba, iωab, iωba = pinv.((σab, σba, ωab, ωba))
     @tensor begin
-        a[1,2,3,4,5] = qa[1,3,4,-1] * Uθ[-1,5,2]
         a[1,2,3,4,5] = a[-1,2,-3,-4,5] * iωba[1,-1] * iωab[3,-3] * iσba[4,-4]
-
-        b[1,2,3,4,5] = Vdθ[4,-4,5] * qb[-4,1,2,3]
-        b[1,2,3,4,5] = b[-1,-2,-3,4,5] * iωba[1,-1] * iωab[3,-3] * iσab[2,-2]
+        b[1,2,3,4,5] = b[-1,-2,-3,4,5] * iωab[1,-1] * iωba[3,-3] * iσba[2,-2]
      end
 
      apply!(Σθ, x -> x .= x ./ norm(x))
