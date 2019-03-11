@@ -174,3 +174,50 @@ function update!((a,b,σab), (σba, ωab, ωba, u))
      copyto!(σab, Σθ)
      return a, b, σab
 end
+
+"""
+    energy(su::SimpleUpdateProblem, h)
+returns the energy calculated with diagrams such as:
+
+            √ωab      √ωba
+            / |       /|
+    √σba-[a*]-σab--[b*]√σba
+    |    /|   |    /|  |  |
+    | √ωba|   | √ωab|  |  |
+    |   | |___|___|_|  |  |
+    |   | [____h__|_]  |  |
+    |   | | √ωab  | |√ωba |
+    |   | | /     | | /   |
+    √σba|[a]--σab-|[b]√σba-
+        |/        |/
+      √ωba      √ωab
+
+which might not be the correct approach
+"""
+function energy(su::SimpleUpdateProblem, h)
+    @unpack a, b, σab, σba, ωab, ωba = su
+    sqtσab, sqtσba, sqtωab, sqtωba = apply.((σab, σba, ωab, ωba), x -> x .= sqrt(x))
+
+    @tensor aw[1,2,3,4,5] := a[-1,-2,-3,-4,5] * sqtσba[4,-4] * sqtσab[-2,2] *
+                             sqtωba[1,-1] * sqtωab[-3,3]
+    @tensor bw[1,2,3,4,5] := b[-1,-2,-3,-4,5] * sqtσab[-4,4] * sqtσba[2,-2] *
+                             sqtωab[1,-1] * sqtωba[-3,3]
+    #E horizontal a-b
+    @tensor ehab = aw[-1,l1,-3,-4,1] * conj(aw)[-1,l2,-3,-4,3] *
+                   bw[-5,-6,-7,l1,2] * conj(bw)[-5,-6,-7,l2,4] *
+                   h[1,2,3,4]
+    #E horizontal b-a
+    @tensor ehba = bw[-1,l1,-3,-4,1] * conj(bw)[-1,l2,-3,-4,3] *
+                   aw[-5,-6,-7,l1,2] * conj(aw)[-5,-6,-7,l2,4] *
+                   h[1,2,3,4]
+    #E vertical a-b
+    @tensor evab = aw[-1,-2,l1,-4,1] * conj(aw)[-1,-2,l2,-4,3] *
+                   bw[l1,-6,-7,-8,2] * conj(bw)[l2,-6,-7,-8,4] *
+                   h[1,2,3,4]
+    #E vertical b-a
+    @tensor evba = bw[-1,-2,l1,-4,1] * conj(bw)[-1,-2,l2,-4,3] *
+                   aw[l1,-6,-7,-8,2] * conj(aw)[l2,-6,-7,-8,4] *
+                   h[1,2,3,4]
+    e = evab + evba + ehab + ehba
+    return e/2
+end
