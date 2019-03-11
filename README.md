@@ -7,4 +7,24 @@
 [![Codecov](https://codecov.io/gh/under-Peter/SimpleUpdate.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/under-Peter/SimpleUpdate.jl)
 
 ## About
-SimpleUpdate.jl is a package that implements the algorithm of the same name for *iPEPS*.
+SimpleUpdate.jl is a package that implements the algorithm of the same name for *iPEPS* as follows:
+
+1. The problem is described by providing two initial rank-5 tensors `a` and `b` and a propagator rank-4 tensor `u`  whose indices are ordered as:
+
+
+    3|________4|
+     [____u____]
+    1|        2|
+
+       5| /3
+    4--[a]--2
+       /1
+here the 5th index of `a` is the _physical_ index, indices 1-4 are virtual.
+
+2. `simpleupdate(a,b,u)` returns a `SimpleUpdateProblem` struct which contains the three tensors that specify the problem as well as the weights on the virtual bonds that have been extracted to describe an environment.
+The weights are extracted using `extract_weight!`, see `?extract_weight!` for the exact algorithm.
+
+3. With `update!(su)`, the `SimpleUpdateProblem` `su` is advanced one application of `u` on each configuration of the two tensors `a` `b`, i.e. horizontally `[a]-[b]` and `[b]-[a]` and rotated by 90°.
+
+
+## Issues
