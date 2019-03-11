@@ -206,18 +206,26 @@ function energy(su::SimpleUpdateProblem, h)
     @tensor ehab = aw[-1,l1,-3,-4,1] * conj(aw)[-1,l2,-3,-4,3] *
                    bw[-5,-6,-7,l1,2] * conj(bw)[-5,-6,-7,l2,4] *
                    h[1,2,3,4]
+    @tensor nhab = aw[-1,l1,-3,-4,i1] * conj(aw)[-1,l2,-3,-4,i2] *
+                   bw[-5,-6,-7,l1,i1] * conj(bw)[-5,-6,-7,l2,i2]
     #E horizontal b-a
     @tensor ehba = bw[-1,l1,-3,-4,1] * conj(bw)[-1,l2,-3,-4,3] *
                    aw[-5,-6,-7,l1,2] * conj(aw)[-5,-6,-7,l2,4] *
                    h[1,2,3,4]
+    @tensor nhba = bw[-1,l1,-3,-4,i1] * conj(bw)[-1,l2,-3,-4,i2] *
+                   aw[-5,-6,-7,l1,i1] * conj(aw)[-5,-6,-7,l2,i2]
     #E vertical a-b
     @tensor evab = aw[-1,-2,l1,-4,1] * conj(aw)[-1,-2,l2,-4,3] *
                    bw[l1,-6,-7,-8,2] * conj(bw)[l2,-6,-7,-8,4] *
                    h[1,2,3,4]
+    @tensor nvab = aw[-1,-2,l1,-4,i1] * conj(aw)[-1,-2,l2,-4,i2] *
+                   bw[l1,-6,-7,-8,i1] * conj(bw)[l2,-6,-7,-8,i2]
     #E vertical b-a
     @tensor evba = bw[-1,-2,l1,-4,1] * conj(bw)[-1,-2,l2,-4,3] *
                    aw[l1,-6,-7,-8,2] * conj(aw)[l2,-6,-7,-8,4] *
                    h[1,2,3,4]
-    e = evab + evba + ehab + ehba
+    @tensor nvba = bw[-1,-2,l1,-4,i1] * conj(bw)[-1,-2,l2,-4,i2] *
+                   aw[l1,-6,-7,-8,i1] * conj(aw)[l2,-6,-7,-8,i2]
+    e = ehab/nhab + ehba/nhba + evab/nvab + evba/nvba
     return e/2
 end

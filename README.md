@@ -28,3 +28,38 @@ The weights are extracted using `extract_weight!`, see `?extract_weight!` for th
 
 
 ## Issues
+
+When doing e.g.
+```julia
+χ = 4
+u = tfisingpropagator(0,0.1)
+h = tfisinghamiltonian(0.1)
+ainit, binit = DTensor(rand(χ,χ,χ,χ,2)), DTensor(rand(χ,χ,χ,χ,2))
+su = simpleupdate(u,ainit,binit)
+su2 = update(su)
+su3 = update(su2)
+energy(su, h)
+energy(su2, h)
+energy(su3, h)
+```
+the energy is _not_ constant, despite propagating for `t=0` being a no-op. That could be caused by an error in the code or the energy being calculated wrong.
+The terms in the energy are calculated with diagrams such as:
+```
+
+            √ωab      √ωba
+            / |       /|
+    √σba-[a*]-σab--[b*]√σba
+    |    /|   |    /|  |  |
+    | √ωba|   | √ωab|  |  |
+    |   | |   |   | |  |  |
+    |   | |___|___|_|  |  |
+    |   | [____h__|_]  |  |
+    |   | |   |   | |  |  |
+    |   | | √ωab  | |√ωba |
+    |   | | /     | | /   |
+    √σba|[a]--σab-|[b]√σba-
+        |/        |/
+      √ωba      √ωab
+
+```
+which might be wrong (other sources use the tensors `a` and `b` for *CTM*.)
