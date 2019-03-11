@@ -62,4 +62,5 @@ The terms in the energy are calculated with diagrams such as:
       √ωba      √ωab
 
 ```
+
 which might be wrong (other sources use the tensors `a` and `b` for *CTM*.)
