@@ -78,6 +78,7 @@ function update!((a,b,σab), (σba, ωab, ωba, u))
     #reduce tensors and apply u
     qa, ra = tensorqr(aw, ((1,3,4),(5,2)))
     rb, qb = tensorrq(bw, ((4,5),(1,2,3)))
+
     @tensor θ[1,2,3,4] := ra[1,p1,-1] * σab[-1,-2] * rb[-2,p2,3] * u[p1,p2,2,4]
 
     #truncate bond dim
@@ -85,18 +86,19 @@ function update!((a,b,σab), (σba, ωab, ωba, u))
     Uθ, Σθ, Vdθ = tensorsvd(θ, ((1,2),(3,4)), svdtrunc = svdtrunc_maxχ(s))
 
     @tensor begin
-        a[1,2,3,4,5] = qa[1,3,4,-1] * Uθ[-1,5,2]
-        b[1,2,3,4,5] = Vdθ[4,-4,5] * qb[-4,1,2,3]
+        aw[1,2,3,4,5] = qa[1,3,4,-1] * Uθ[-1,5,2]
+        bw[1,2,3,4,5] = Vdθ[4,-4,5] * qb[-4,1,2,3]
     end
 
     #reextract weights
     iσab, iσba, iωab, iωba = pinv.((σab, σba, ωab, ωba))
-    @tensor begin
-        a[1,2,3,4,5] = a[-1,2,-3,-4,5] * iωba[1,-1] * iωab[3,-3] * iσba[4,-4]
-        b[1,2,3,4,5] = b[-1,-2,-3,4,5] * iωab[1,-1] * iωba[3,-3] * iσba[2,-2]
-     end
 
-     apply!(Σθ, x -> x .= x ./ norm(x))
+    @tensor begin
+        a[1,2,3,4,5] = iσba[4,-4] * aw[-1,2,-3,-4,5] * iωba[1,-1] * iωab[-3,3]
+        b[1,2,3,4,5] = iσba[-2,2] * bw[-1,-2,-3,4,5] * iωab[1,-1] * iωba[-3,3]
+    end
+
+     apply!(Σθ, x -> x .= x ./ sum(diag(x)))
      copyto!(σab, Σθ)
      return a, b, σab
 end
