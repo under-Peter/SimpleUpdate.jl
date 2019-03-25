@@ -36,86 +36,12 @@ with the indices-ordering like:
 
 """
 function simpleupdate(u, ainit, binit)
-    a, b, σab, σba, ωab, ωba = extract_weights!(deepcopy(ainit),deepcopy(binit))
-    apply!.((σab, σba, ωab, ωba), x -> x .= x ./ norm(x))
+    a, b = deepcopy(ainit), deepcopy(binit)
+    σab = TensorOperations.similar_from_indices(
+        real(eltype(a)), (2,), (4,), (1,),(2,), a, b, :Y, :Y)
+    σba, ωab, ωba = deepcopy(σab), deepcopy(σab), deepcopy(σab)
+    apply!.((σab, σba, ωab, ωba), x -> x .= Matrix(I, size(x)...))
     return SimpleUpdateProblem{typeof(u), typeof(a), typeof(σab)}(u, a, b, σab, σba, ωab, ωba)
-end
-
-"""
-    extract_weight!(a,b)
-returns `σ`, `a'`, `b'` where `σ` is a weight on the leg connecting index 2 of `a`
-with index 4 of `b` (i.e. `a` is to the left of `b`).
-The weight is extracted by the following steps:
-1. input
-
-
-       | /  | /
-    --[a]--[b]--
-      /    /
-
-2. isommetrize w.r.t connecting leg
-
-
-        | /                          | /
-     --[Ua]--[Σa]--[Va]-[Ub]--[Σb]--[b]--
-       /                            /
-
-3. svd on leg-matrix
-
-
-     -[c]- = --[Σa]--[Va]-[Ub]--[Σb]--
-
-     -[Uc]--[σc]--[Vc]- = -[c]-
-
-4. reabsorbing unitaries
-
-
-         | /           | /
-     --[a*Uc]--[σc]--[Vc*b]--
-        /             /
-"""
-function extract_weight!(a,b)
-    Ua, Σa, Vda = tensorsvd(a, ((1,3,4,5),(2,)))
-    Ub, Σb, Vdb = tensorsvd(b, ((4,),(1,2,3,5)))
-    @tensor c[1,2] := Σa[1,-1] * Vda[-1,-2] * Ub[-2,-3] * Σb[-3,2]
-    Uc, Σc, Vdc = tensorsvd(c)
-
-    @tensor begin
-        a[1,2,3,4,5] = Ua[1,3,4,5,-2] * Uc[-2,2]
-        b[1,2,3,4,5] = Vdc[4,-4] * Vdb[-4,1,2,3,5]
-    end
-    return Σc, a, b
-end
-
-"""
-    extract_weights!(a,b)
-returns  new tensors `a`, `b` and their weights `σab`, `σba`, `ωab`, `ωba`,
-where `σ` are horizontal and `ω` vertical weights and `ab`/`ba` is read from
-left to right and down to up respectively, i.e.
-
-          |  ωab
-          | /
-    -σba-[a]--σab--[b]
-         /
-       ωba
-"""
-function extract_weights!(a,b)
-    σab, a , b = extract_weight!(a,b)
-    σba, b , a = extract_weight!(b,a)
-    @tensor begin
-        arot[1,2,3,4,5] := a[4,1,2,3,5]
-        brot[1,2,3,4,5] := b[4,1,2,3,5]
-    end
-
-    ωab, arot, brot = extract_weight!(arot, brot)
-    ωba, brot, arot = extract_weight!(brot, arot)
-
-    @tensor begin
-        a[1,2,3,4,5] = arot[2,3,4,1,5]
-        b[1,2,3,4,5] = brot[2,3,4,1,5]
-    end
-
-    return a, b, σab, σba, ωab, ωba
 end
 
 update(su::SimpleUpdateProblem) = update!(deepcopy(su))
@@ -196,36 +122,56 @@ which might not be the correct approach
 """
 function energy(su::SimpleUpdateProblem, h)
     @unpack a, b, σab, σba, ωab, ωba = su
-    sqtσab, sqtσba, sqtωab, sqtωba = apply.((σab, σba, ωab, ωba), x -> x .= sqrt(x))
+    @tensor aw[1,2,3,4,5] := a[-1,-2,-3,-4,5] *
+                             ωba[1,-1] *
+                             σab[-2,2] *
+                             ωab[-3,3] *
+                             σba[4,-4]
 
-    @tensor aw[1,2,3,4,5] := a[-1,-2,-3,-4,5] * sqtσba[4,-4] * sqtσab[-2,2] *
-                             sqtωba[1,-1] * sqtωab[-3,3]
-    @tensor bw[1,2,3,4,5] := b[-1,-2,-3,-4,5] * sqtσab[-4,4] * sqtσba[2,-2] *
-                             sqtωab[1,-1] * sqtωba[-3,3]
     #E horizontal a-b
+    @tensor bw[1,2,3,4,5] := b[-1,-2,-3,4,5] *
+                             ωab[1,-1] *
+                             σba[2,-2] *
+                             ωba[-3,3]
     @tensor ehab = aw[-1,l1,-3,-4,1] * conj(aw)[-1,l2,-3,-4,3] *
                    bw[-5,-6,-7,l1,2] * conj(bw)[-5,-6,-7,l2,4] *
                    h[1,2,3,4]
-    @tensor nhab = aw[-1,l1,-3,-4,i1] * conj(aw)[-1,l2,-3,-4,i2] *
-                   bw[-5,-6,-7,l1,i1] * conj(bw)[-5,-6,-7,l2,i2]
+    @tensor nhab = aw[-1,l1,-3,-4,i1] * conj(aw)[-1,l2,-3,-4,i1] *
+                   bw[-5,-6,-7,l1,i2] * conj(bw)[-5,-6,-7,l2,i2]
+
     #E horizontal b-a
+    @tensor bw[1,2,3,4,5] := b[-1,2,-3,-4,5] *
+                             ωab[1,-1] *
+                             ωba[-3,3] *
+                             σab[4,-4]
     @tensor ehba = bw[-1,l1,-3,-4,1] * conj(bw)[-1,l2,-3,-4,3] *
                    aw[-5,-6,-7,l1,2] * conj(aw)[-5,-6,-7,l2,4] *
                    h[1,2,3,4]
-    @tensor nhba = bw[-1,l1,-3,-4,i1] * conj(bw)[-1,l2,-3,-4,i2] *
-                   aw[-5,-6,-7,l1,i1] * conj(aw)[-5,-6,-7,l2,i2]
+    @tensor nhba = bw[-1,l1,-3,-4,i1] * conj(bw)[-1,l2,-3,-4,i1] *
+                   aw[-5,-6,-7,l1,i2] * conj(aw)[-5,-6,-7,l2,i2]
+
     #E vertical a-b
+    @tensor bw[1,2,3,4,5] := b[1,-2,-3,-4,5] *
+                             σba[2,-2] *
+                             ωba[-3,3] *
+                             σab[4,-4]
     @tensor evab = aw[-1,-2,l1,-4,1] * conj(aw)[-1,-2,l2,-4,3] *
                    bw[l1,-6,-7,-8,2] * conj(bw)[l2,-6,-7,-8,4] *
                    h[1,2,3,4]
-    @tensor nvab = aw[-1,-2,l1,-4,i1] * conj(aw)[-1,-2,l2,-4,i2] *
-                   bw[l1,-6,-7,-8,i1] * conj(bw)[l2,-6,-7,-8,i2]
+    @tensor nvab = aw[-1,-2,l1,-4,i1] * conj(aw)[-1,-2,l2,-4,i1] *
+                   bw[l1,-6,-7,-8,i2] * conj(bw)[l2,-6,-7,-8,i2]
+
     #E vertical b-a
+    @tensor bw[1,2,3,4,5] := b[-1,-2,3,-4,5] *
+                             ωab[1,-1] *
+                             σba[2,-2] *
+                             σab[4,-4]
     @tensor evba = bw[-1,-2,l1,-4,1] * conj(bw)[-1,-2,l2,-4,3] *
                    aw[l1,-6,-7,-8,2] * conj(aw)[l2,-6,-7,-8,4] *
                    h[1,2,3,4]
-    @tensor nvba = bw[-1,-2,l1,-4,i1] * conj(bw)[-1,-2,l2,-4,i2] *
-                   aw[l1,-6,-7,-8,i1] * conj(aw)[l2,-6,-7,-8,i2]
-    e = ehab/nhab + ehba/nhba + evab/nvab + evba/nvba
-    return e/2
+    @tensor nvba = bw[-1,-2,l1,-4,i1] * conj(bw)[-1,-2,l2,-4,i1] *
+                   aw[l1,-6,-7,-8,i2] * conj(aw)[l2,-6,-7,-8,i2]
+    es = (ehab/nhab,  ehba/nhba, evab/nvab, evba/nvba)
+    return Real.(es)
+    return sum(es)/2
 end
